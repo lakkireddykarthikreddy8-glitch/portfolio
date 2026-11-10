@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fast-charging chain simulator — recreation of my thesis GUI</title>
+<meta property="og:type" content="website">
+<meta property="og:title" content="Fast-charging chain simulator, an illustrative recreation of my thesis GUI">
+<meta property="og:description" content="Run a simulated fast charge from the AC grid to the battery at different ambient temperatures. Illustrative model with assumed parameters.">
+<meta property="og:image" content="https://YOUR-SITE-URL/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  color-scheme: light;
+  --paper: #edf1f3; --surface: #f8fafb; --ink: #102230; --muted: #4b5f6b; --line: #cbd6dc; --stage: #e1e9ed;
+  --cold: #2f62d3; --opt: #1b9c86; --warm: #cf8715; --hot: #d2432a; --cyan: #1c9fc4; --focus: #1b5fd6;
+  --loss: #d9822b; --grid: #c4d0d7;
+  --head: 'Bricolage Grotesque', 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --body: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #0c171d; --surface: #132229; --ink: #e8f0f3; --muted: #9fb2bc; --line: #28414c; --stage: #10242d;
+    --cold: #5b8cf0; --opt: #2cc3aa; --warm: #efae43; --hot: #f2664b; --cyan: #4cc2e6; --focus: #8db4ff;
+    --loss: #ef9a4a; --grid: #28414c;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #0c171d; --surface: #132229; --ink: #e8f0f3; --muted: #9fb2bc; --line: #28414c; --stage: #10242d;
+  --cold: #5b8cf0; --opt: #2cc3aa; --warm: #efae43; --hot: #f2664b; --cyan: #4cc2e6; --focus: #8db4ff;
+  --loss: #ef9a4a; --grid: #28414c;
+}
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+button, select, input { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.wrap { width: min(1180px, 100% - 32px); margin-inline: auto; padding-bottom: 40px; }
+header.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 0 6px; }
+h1 { font-family: var(--head); font-weight: 500; font-size: clamp(1.5rem, 3.4vw, 2.3rem); letter-spacing: -0.02em; line-height: 1.1; margin: 0; }
+.theme { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 7px 14px; cursor: pointer; min-height: 40px; }
+.banner { border: 1px solid var(--line); background: var(--surface); border-radius: 12px; padding: 12px 16px; margin: 10px 0 16px; font-size: 0.93rem; color: var(--muted); }
+.banner strong { color: var(--ink); font-weight: 600; }
+
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 0; }
+.tab { border: 1px solid transparent; border-bottom: 0; background: transparent; padding: 10px 18px; cursor: pointer; border-radius: 10px 10px 0 0; min-height: 44px; }
+.tab[aria-selected="true"] { background: var(--stage); border-color: var(--line); font-weight: 600; margin-bottom: -1px; }
+.panel { background: var(--stage); border: 1px solid var(--line); border-top: 0; border-radius: 0 0 14px 14px; padding: 18px; }
+.panel[hidden] { display: none; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; margin-bottom: 18px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+select, .num { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 8px 10px; min-height: 40px; }
+.num { width: 86px; }
+.btn { border: 1px solid var(--ink); background: var(--ink); color: var(--paper); border-radius: 999px; padding: 9px 22px; cursor: pointer; min-height: 42px; font-weight: 500; }
+.btn.alt { background: transparent; color: var(--ink); border-color: var(--line); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.play { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 0 0 16px; }
+.play input[type=range] { flex: 1 1 220px; min-width: 160px; accent-color: var(--opt); }
+.clock { font-variant-numeric: tabular-nums; min-width: 9ch; }
+
+/* chain */
+.chain { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(190px, 1.1fr); gap: 14px 16px; align-items: start; }
+.blk { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; min-height: 100%; }
+.blk svg { width: 100%; height: 120px; }
+.blk p.cap { margin: 0; font-size: 0.85rem; color: var(--muted); line-height: 1.35; }
+.fld { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 0.9rem; }
+.fld .k { color: var(--muted); }
+.fld .v { min-width: 8.5ch; text-align: right; padding: 4px 9px; border-radius: 6px; font-weight: 600; font-variant-numeric: tabular-nums; background: var(--ok); color: #06210f; transition: background 0.3s; }
+.fld .v[data-s="ok"] { background: #7ddf8f; color: #06210f; }
+.fld .v[data-s="lim"] { background: #f0b24a; color: #2b1900; }
+.fld .v[data-s="bad"] { background: #f06a52; color: #2a0700; }
+.fld .v[data-s="cold"] { background: #8fb2ff; color: #07163a; }
+.fld .v[data-s="cyan"] { background: #7fd8ee; color: #04222b; }
+.fld .v[data-s="idle"] { background: var(--line); color: var(--muted); }
+.fld.wide .v { min-width: 14ch; }
+.rightcol { display: flex; flex-direction: column; gap: 10px; }
+.flow { stroke-dasharray: 6 6; }
+.running .flow { animation: flow 1s linear infinite; }
+@keyframes flow { to { stroke-dashoffset: -24; } }
+.summary { margin: 14px 0 0; font-size: 0.95rem; }
+details { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px; }
+summary { cursor: pointer; font-weight: 500; }
+.assume { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 4px 24px; font-size: 0.9rem; color: var(--muted); margin: 10px 0 0; padding: 0; list-style: none; }
+.assume b { color: var(--ink); font-weight: 600; }
+
+/* charts */
+.charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.chart { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px 6px; }
+.chart.wide { grid-column: 1 / -1; }
+.chart h3 { font-family: var(--head); font-weight: 500; font-size: 1.02rem; margin: 0 0 2px; }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart text { font-family: var(--body); fill: var(--muted); font-size: 11px; }
+.legendrow { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 0.85rem; color: var(--muted); margin: 0 0 2px; }
+.sw { display: inline-block; width: 12px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+.empty { color: var(--muted); padding: 30px 6px; }
+.sankeywrap { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+.sankeywrap svg { width: 100%; height: auto; display: block; }
+.sankeywrap text { font-family: var(--body); fill: var(--ink); font-size: 12px; }
+.sankeywrap .m { fill: var(--muted); }
+table.vals { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.92rem; }
+table.vals th, table.vals td { text-align: left; padding: 6px 8px; border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+table.vals th { font-weight: 600; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (max-width: 980px) { .chain { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rightcol { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; } }
+@media (max-width: 700px) { .charts { grid-template-columns: 1fr; } .panel { padding: 12px; } .tab { padding: 10px 12px; } .rightcol { grid-template-columns: 1fr; } }
+@media (max-width: 440px) { .chain { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <header class="top">
+    <h1>Fast-charging chain simulator</h1>
+    <span style="display:flex;gap:10px;align-items:center"><a href="index.html" style="color:inherit;text-underline-offset:4px">Back to my portfolio</a><button class="theme" id="theme" type="button" aria-pressed="false">Dark mode</button></span>
+  </header>
+  <div class="banner"><strong>An illustrative recreation of the GUI from my master’s thesis.</strong> It keeps the structure (ambient temperature, a run button, the chain from grid to battery, and Parameters, Graphs and Sankey tabs), but the physics is simplified and the battery, thermal and limit values are assumed placeholders. Only the 97 % AC/DC and 96 % DC/DC efficiencies come from my validated results. None of the curves below are thesis data.</div>
+
+  <div class="tabs" role="tablist" aria-label="Simulator views">
+    <button class="tab" role="tab" id="t-params" aria-selected="true" aria-controls="p-params" type="button">Parameters</button>
+    <button class="tab" role="tab" id="t-graphs" aria-selected="false" aria-controls="p-graphs" tabindex="-1" type="button">Graphs</button>
+    <button class="tab" role="tab" id="t-sankey" aria-selected="false" aria-controls="p-sankey" tabindex="-1" type="button">Sankey</button>
+  </div>
+
+  <section class="panel" id="p-params" role="tabpanel" aria-labelledby="t-params">
+    <div class="controls">
+      <label>Ambient temperature
+        <select id="amb">
+          <option value="-20">−20 °C</option><option value="-10">−10 °C</option><option value="0">0 °C</option>
+          <option value="10">10 °C</option><option value="20" selected>20 °C</option><option value="30">30 °C</option>
+          <option value="40">40 °C</option><option value="50">50 °C</option>
+        </select>
+      </label>
+      <button class="btn" id="run" type="button">Run simulation</button>
+    </div>
+    <div class="play">
+      <button class="btn alt" id="pp" type="button" disabled>Pause</button>
+      <label>Speed
+        <select id="speed"><option value="10">10×</option><option value="30">30×</option><option value="60" selected>60×</option><option value="150">150×</option></select>
+      </label>
+      <input type="range" id="scrub" min="0" max="0" value="0" step="1" disabled aria-label="Simulation time">
+      <span class="clock" id="clock">00:00</span>
+    </div>
+
+    <div class="chain" id="chain">
+      <div class="blk">
+        <div class="fld"><span class="k">Time remaining</span><span class="v" id="f-rem" data-s="idle">—</span></div>
+        <div class="fld"><span class="k">Power</span><span class="v" id="f-pow" data-s="idle">—</span></div>
+        <svg viewBox="0 0 160 120" role="img" aria-label="Charging station"><rect x="38" y="14" width="56" height="92" rx="7" fill="none" stroke="currentColor" stroke-width="3"/><rect x="48" y="24" width="36" height="24" rx="3" fill="var(--opt)" opacity="0.35"/><path d="M70 52 L58 76 H68 L64 96 L82 68 H71 Z" fill="var(--opt)"/><path d="M94 40 H108 Q118 40 118 50 V84 Q118 92 126 92" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><rect x="121" y="30" width="5" height="12" rx="1" fill="currentColor"/><rect x="129" y="30" width="5" height="12" rx="1" fill="currentColor"/></svg>
+        <p class="cap">3-phase grid, 400 V AC to 540 V DC (AC/DC stage at 97 % efficiency)</p>
+      </div>
+      <div class="blk">
+        <div class="fld"><span class="k">Cable temp</span><span class="v" id="f-cab" data-s="idle">—</span></div>
+        <svg viewBox="0 0 160 120" role="img" aria-label="Liquid-cooled charging cable"><path d="M16 96 Q 50 96 60 70 T 110 44" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" opacity="0.9"/><path class="flow" d="M16 96 Q 50 96 60 70 T 110 44" fill="none" stroke="var(--cyan)" stroke-width="5" stroke-linecap="round"/><rect x="104" y="24" width="38" height="34" rx="8" fill="var(--surface)" stroke="currentColor" stroke-width="3" transform="rotate(-8 123 41)"/><circle cx="117" cy="38" r="4" fill="currentColor"/><circle cx="130" cy="40" r="4" fill="currentColor"/></svg>
+        <p class="cap">Liquid-cooled cable between the charger and the car</p>
+      </div>
+      <div class="blk">
+        <div class="fld"><span class="k">Current</span><span class="v" id="f-cur" data-s="idle">—</span></div>
+        <svg viewBox="0 0 160 120" role="img" aria-label="DC/DC converter"><rect x="30" y="14" width="100" height="92" rx="6" fill="none" stroke="var(--opt)" stroke-width="4"/><path d="M30 106 L130 14" stroke="var(--opt)" stroke-width="4"/><text x="42" y="46" font-size="22" font-weight="700" fill="currentColor" font-family="var(--body)">DC</text><text x="86" y="96" font-size="22" font-weight="700" fill="currentColor" font-family="var(--body)">DC</text><path d="M12 36 H30 M130 84 H150" stroke="var(--opt)" stroke-width="4"/></svg>
+        <p class="cap">On-board DC/DC converter regulates 520 V DC to the battery pack voltage (96 % efficiency)</p>
+      </div>
+      <div class="blk">
+        <div class="fld"><span class="k">Charging state</span><span class="v" id="f-st" data-s="idle">Idle</span></div>
+        <svg viewBox="0 0 160 120" role="img" aria-label="Electric car charging"><path d="M14 80 L22 56 Q28 44 44 44 H92 Q108 44 118 58 L140 62 Q148 64 148 72 V84 H14 Z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><circle cx="42" cy="86" r="11" fill="var(--surface)" stroke="currentColor" stroke-width="3"/><circle cx="118" cy="86" r="11" fill="var(--surface)" stroke="currentColor" stroke-width="3"/><rect x="52" y="56" width="42" height="14" rx="3" fill="none" stroke="var(--opt)" stroke-width="2.5"/><rect id="car-soc" x="54" y="58" width="2" height="10" fill="var(--opt)"/><path d="M148 70 H156" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+        <p class="cap" id="state-cap">Pick an ambient temperature and run the simulation.</p>
+      </div>
+      <div class="rightcol">
+        <div class="fld"><span class="k">Temperature</span><span class="v" id="f-tb" data-s="idle">—</span></div>
+        <div class="fld"><span class="k">Battery voltage</span><span class="v" id="f-vb" data-s="idle">—</span></div>
+        <div class="fld"><span class="k">SOC</span><span class="v" id="f-soc" data-s="idle">—</span></div>
+        <div class="fld"><span class="k">Energy</span><span class="v" id="f-en" data-s="idle">—</span></div>
+      </div>
+    </div>
+    <p class="summary" id="summary" aria-live="polite"></p>
+
+    <details>
+      <summary>Assumptions and options</summary>
+      <div class="controls" style="margin-top:12px">
+        <label>Battery energy (kWh) <input class="num" id="o-E" type="number" min="30" max="130" value="75"></label>
+        <label>Start SOC (%) <input class="num" id="o-s0" type="number" min="5" max="60" value="10"></label>
+        <label>Target SOC (%) <input class="num" id="o-s1" type="number" min="60" max="100" value="80"></label>
+        <label><input type="checkbox" id="o-tms" checked> Active cooling and heating of the pack</label>
+      </div>
+      <ul class="assume">
+        <li><b>AC/DC efficiency:</b> 97 % (validated result)</li>
+        <li><b>DC/DC efficiency:</b> 96 % (validated result)</li>
+        <li><b>DC link voltage:</b> 520 V</li>
+        <li><b>Cable current limit:</b> 500 A, derated from 60 °C</li>
+        <li><b>Battery current limit:</b> 500 A (assumed)</li>
+        <li><b>Pack voltage:</b> 330 V at 0 % to 420 V at 100 % (assumed)</li>
+        <li><b>Optimal pack range:</b> 20 to 40 °C, current derated outside it (assumed)</li>
+        <li><b>Pack resistance:</b> 20 mΩ at 25 °C, higher when cold (assumed)</li>
+        <li><b>Pack heat capacity:</b> 350 kJ/K (assumed)</li>
+        <li><b>Cooling and heating:</b> up to 6 kW cooling, 9 kW heating, aim 25 to 35 °C (assumed)</li>
+        <li><b>Cable coolant:</b> 25 °C, or ambient plus 8 K if hotter (assumed)</li>
+        <li><b>Starting state:</b> pack and cable at ambient temperature</li>
+      </ul>
+    </details>
+  </section>
+
+  <section class="panel" id="p-graphs" role="tabpanel" aria-labelledby="t-graphs" hidden>
+    <div id="graphs"><p class="empty">Run a simulation on the Parameters tab to see the curves.</p></div>
+  </section>
+
+  <section class="panel" id="p-sankey" role="tabpanel" aria-labelledby="t-sankey" hidden>
+    <div id="sankey"><p class="empty">Run a simulation on the Parameters tab to see where the energy goes.</p></div>
+  </section>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var NS = 'http://www.w3.org/2000/svg';
+
+  /* ------------------------------------------------------------ simulation */
+  function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+  function tempFactor(T) {
+    if (T < 20) { return clamp(0.1 + 0.9 * (T + 20) / 40, 0.1, 1); }
+    if (T > 40) { return clamp(1 - (T - 40) / 15, 0, 1); }
+    return 1;
+  }
+  function cableFactor(T) { return clamp(1 - (T - 60) / 30, 0, 1); }
+
+  function simulate(p) {
+    var dt = 1, t = 0, soc = p.soc0, Tb = p.Tamb, Tc = p.Tamb;
+    var Ah = p.E * 1000 / 375;
+    var Tcool = Math.max(25, p.Tamb + 8);
+    var S = { t: [], I: [], P: [], Pg: [], V: [], Tb: [], Tc: [], soc: [], st: [], en: [], c: [] };
+    var E = { grid: 0, aux: 0, acdc: 0, cable: 0, dcdc: 0, rint: 0, stored: 0 };
+    var lowCount = 0, status = 'done';
+    while (t < p.maxT) {
+      var R = p.R0 * Math.exp(0.03 * (25 - Tb));
+      var Voc = 330 + 90 * soc;
+      var Iv = Math.max(0, (p.Vmax - Voc) / R);
+      var fT = tempFactor(Tb), fC = cableFactor(Tc);
+      var Ib = Math.min(p.Ibmax * fT, Iv);
+      var Rc = p.Rc0 * (1 + 0.004 * (Tc - 20));
+      var Vt = Voc + Ib * R;
+      var Icab = (Vt * Ib / p.etaDc) / p.Vdc;
+      var cabLim = p.Icable * fC;
+      var cableBound = false;
+      if (Icab > cabLim && Icab > 0) { Ib = Ib * cabLim / Icab; cableBound = true; Vt = Voc + Ib * R; Icab = (Vt * Ib / p.etaDc) / p.Vdc; }
+      var st;
+      if (soc >= p.soc1) { st = 'Complete'; }
+      else if (fT < 1 && Tb < 20) { st = 'Derated: battery cold'; }
+      else if (fT < 1) { st = 'Derated: battery hot'; }
+      else if (cableBound) { st = 'Derated: cable'; }
+      else if (Iv < p.Ibmax) { st = 'Taper: voltage limit'; }
+      else { st = 'Fast charge'; }
+      // power chain
+      var Pb = Vt * Ib;
+      var Pdc = Pb / p.etaDc;
+      var Pcab = Icab * Icab * Rc;
+      var Pchg = (Pdc + Pcab) / p.etaAc;
+      // thermal management
+      var Qtms = 0, Paux = 0;
+      if (p.tms) {
+        if (Tb > 35) { var pc = Math.min(p.Pcool, 800 * (Tb - 35)); Qtms = -pc; Paux = pc / 3; }
+        else if (Tb < 25) { var ph = Math.min(p.Pheat, 600 * (25 - Tb)); Qtms = ph; Paux = ph; }
+      }
+      var Pg = Pchg + Paux;
+      S.t.push(t); S.I.push(Ib); S.P.push(Pb / 1000); S.Pg.push(Pg / 1000); S.V.push(Vt);
+      S.Tb.push(Tb); S.Tc.push(Tc); S.soc.push(soc * 100); S.st.push(st);
+      S.en.push(E.stored + 0); S.c.push([E.grid, E.aux, E.acdc, E.cable, E.dcdc, E.rint, E.stored]);
+      if (soc >= p.soc1) { status = 'done'; break; }
+      lowCount = Ib < 2 ? lowCount + 1 : 0;
+      if (lowCount > 120) { status = 'stalled'; S.st[S.st.length - 1] = 'Stalled'; break; }
+      var k = dt / 3.6e6;
+      E.grid += Pg * k; E.aux += Paux * k; E.acdc += (Pchg - Pdc - Pcab) * k; E.cable += Pcab * k;
+      E.dcdc += (Pdc - Pb) * k; E.rint += Ib * Ib * R * k; E.stored += Voc * Ib * k;
+      // states
+      var Qb = Ib * Ib * R;
+      Tb += (Qb + Qtms - p.UAb * (Tb - p.Tamb)) * dt / p.Cb;
+      Tc += (Icab * Icab * Rc - p.Gc * (Tc - Tcool)) * dt / p.Cc;
+      soc += Ib * dt / (Ah * 3600);
+      t += dt;
+    }
+    if (t >= p.maxT) { status = 'timeout'; }
+    S.status = status; S.total = S.t[S.t.length - 1]; S.E = E;
+    // final totals include the last accumulation
+    return S;
+  }
+  window.__chargeSim = simulate;
+
+  /* ------------------------------------------------------------ UI state */
+  var sim = null, idx = 0, playing = false, last = 0, raf = 0, tabNow = 'params';
+  var params = null;
+
+  function fmtT(sec) { sec = Math.max(0, Math.round(sec)); var m = Math.floor(sec / 60), s = sec % 60; return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s; }
+  function set(id, text, s) { var el = $(id); el.textContent = text; if (s) { el.setAttribute('data-s', s); } }
+
+  function readParams() {
+    return {
+      Tamb: parseFloat($('amb').value),
+      E: clamp(parseFloat($('o-E').value) || 75, 30, 130),
+      soc0: clamp((parseFloat($('o-s0').value) || 10) / 100, 0.05, 0.6),
+      soc1: clamp((parseFloat($('o-s1').value) || 80) / 100, 0.6, 1),
+      tms: $('o-tms').checked,
+      etaAc: 0.97, etaDc: 0.96, Vdc: 520, Icable: 500, Ibmax: 500, Vmax: 420,
+      R0: 0.02, Cb: 350000, UAb: 15, Rc0: 0.004, Cc: 5000, Gc: 33, Pcool: 6000, Pheat: 9000, maxT: 10800
+    };
+  }
+
+  function stateClass(st) {
+    if (st === 'Fast charge' || st === 'Complete') { return 'ok'; }
+    if (st === 'Stalled') { return 'bad'; }
+    return 'lim';
+  }
+
+  function render(i) {
+    if (!sim) { return; }
+    idx = clamp(i, 0, sim.t.length - 1);
+    var st = sim.st[idx], Tb = sim.Tb[idx], Tc = sim.Tc[idx];
+    var done = idx === sim.t.length - 1 && (sim.status === 'done');
+    set('f-rem', sim.status === 'done' ? fmtT(sim.total - sim.t[idx]) : '—', 'ok');
+    set('f-pow', sim.P[idx].toFixed(0) + ' kW', 'ok');
+    set('f-cab', Tc.toFixed(0) + ' °C', Tc > 75 ? 'bad' : (Tc > 60 ? 'lim' : 'cyan'));
+    set('f-cur', sim.I[idx].toFixed(0) + ' A', 'ok');
+    set('f-st', st, stateClass(st));
+    set('f-tb', Tb.toFixed(1) + ' °C', Tb < 20 ? 'cold' : (Tb > 40 ? 'bad' : 'ok'));
+    set('f-vb', sim.V[idx].toFixed(0) + ' V', 'ok');
+    set('f-soc', sim.soc[idx].toFixed(1) + ' %', 'ok');
+    set('f-en', sim.c[idx][6].toFixed(1) + ' kWh', 'ok');
+    $('state-cap').textContent = st + (st === 'Complete' ? '. Target state of charge reached.' : '');
+    $('car-soc').setAttribute('width', String(Math.max(2, 38 * sim.soc[idx] / 100)));
+    $('clock').textContent = fmtT(sim.t[idx]) + ' / ' + fmtT(sim.total);
+    $('scrub').value = String(idx);
+    document.getElementById('chain').classList.toggle('running', playing);
+    if (tabNow === 'graphs') { moveCursors(); }
+    if (tabNow === 'sankey') { drawSankey(idx); }
+  }
+
+  function tick(now) {
+    if (!playing) { return; }
+    var dtReal = Math.min(0.1, (now - last) / 1000); last = now;
+    var next = idx + dtReal * parseFloat($('speed').value);
+    if (next >= sim.t.length - 1) { render(sim.t.length - 1); playing = false; $('pp').textContent = 'Replay'; announce(); return; }
+    render(Math.floor(next));
+    // keep fractional progress
+    idx = next;
+    raf = requestAnimationFrame(tick);
+  }
+  function startPlay() { playing = true; last = performance.now(); $('pp').textContent = 'Pause'; raf = requestAnimationFrame(tick); }
+  function announce() {
+    var e = sim.E;
+    var msg;
+    if (sim.status === 'done') {
+      msg = 'Charged from ' + Math.round(params.soc0 * 100) + ' % to ' + Math.round(params.soc1 * 100) + ' % in ' + fmtT(sim.total) + ' at ' + params.Tamb + ' °C ambient. Grid energy ' + e.grid.toFixed(1) + ' kWh, stored ' + e.stored.toFixed(1) + ' kWh.';
+    } else if (sim.status === 'stalled') {
+      msg = 'Charging stalled after ' + fmtT(sim.total) + ': the pack temperature left the range where any current is allowed.';
+    } else { msg = 'Stopped after the maximum simulated time.'; }
+    $('summary').textContent = msg + ' (Illustrative model with assumed parameters.)';
+  }
+
+  $('run').addEventListener('click', function () {
+    cancelAnimationFrame(raf);
+    params = readParams();
+    sim = simulate(params);
+    // final accumulate into last cumulative entry for exact totals
+    sim.c[sim.c.length - 1] = [sim.E.grid, sim.E.aux, sim.E.acdc, sim.E.cable, sim.E.dcdc, sim.E.rint, sim.E.stored];
+    $('scrub').max = String(sim.t.length - 1); $('scrub').disabled = false; $('pp').disabled = false;
+    $('summary').textContent = '';
+    buildGraphs(); buildSankeyShell();
+    idx = 0; render(0); startPlay();
+  });
+  $('pp').addEventListener('click', function () {
+    if (!sim) { return; }
+    if (playing) { playing = false; cancelAnimationFrame(raf); $('pp').textContent = 'Play'; render(Math.floor(idx)); return; }
+    if (idx >= sim.t.length - 2) { idx = 0; }
+    startPlay();
+  });
+  $('scrub').addEventListener('input', function () {
+    if (!sim) { return; }
+    var wasPlaying = playing; playing = false; cancelAnimationFrame(raf);
+    render(parseInt(this.value, 10)); $('pp').textContent = 'Play';
+    if (wasPlaying) { /* stay paused while scrubbing */ }
+  });
+
+  /* ------------------------------------------------------------ tabs */
+  var TABS = ['params', 'graphs', 'sankey'];
+  function showTab(name) {
+    tabNow = name;
+    TABS.forEach(function (n) {
+      var sel = n === name;
+      $('t-' + n).setAttribute('aria-selected', sel ? 'true' : 'false');
+      $('t-' + n).setAttribute('tabindex', sel ? '0' : '-1');
+      $('p-' + n).hidden = !sel;
+    });
+    if (sim) { render(Math.floor(idx)); }
+  }
+  TABS.forEach(function (n, i) {
+    $('t-' + n).addEventListener('click', function () { showTab(n); });
+    $('t-' + n).addEventListener('keydown', function (e) {
+      var j = null;
+      if (e.key === 'ArrowRight') { j = (i + 1) % 3; } else if (e.key === 'ArrowLeft') { j = (i + 2) % 3; }
+      if (j !== null) { e.preventDefault(); showTab(TABS[j]); $('t-' + TABS[j]).focus(); }
+    });
+  });
+
+  /* ------------------------------------------------------------ charts */
+  var charts = [];
+  function el(name, attrs, parent) {
+    var e = document.createElementNS(NS, name);
+    Object.keys(attrs || {}).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+    if (parent) { parent.appendChild(e); }
+    return e;
+  }
+  function niceTicks(min, max, n) {
+    var span = max - min || 1, step = Math.pow(10, Math.floor(Math.log10(span / n)));
+    var err = span / n / step; step *= err >= 7 ? 10 : err >= 3 ? 5 : err >= 1.5 ? 2 : 1;
+    var a = Math.floor(min / step) * step, b = Math.ceil(max / step) * step, out = [];
+    for (var v = a; v <= b + step * 0.01; v += step) { out.push(+v.toFixed(6)); }
+    return out;
+  }
+  function chartCard(title, series, opts) {
+    var card = document.createElement('div'); card.className = 'chart' + (opts.wide ? ' wide' : '');
+    var h = document.createElement('h3'); h.textContent = title; card.appendChild(h);
+    var lg = document.createElement('div'); lg.className = 'legendrow';
+    series.forEach(function (s) { var sp = document.createElement('span'); sp.innerHTML = '<i class="sw" style="background:' + s.color + '"></i>'; sp.appendChild(document.createTextNode(s.name)); lg.appendChild(sp); });
+    if (opts.band) { var bp = document.createElement('span'); bp.innerHTML = '<i class="sw" style="background:var(--opt);opacity:.4;height:8px"></i>'; bp.appendChild(document.createTextNode(opts.band.label)); lg.appendChild(bp); }
+    card.appendChild(lg);
+    var W = opts.wide ? 1040 : 520, H = opts.wide ? 240 : 200, m = { l: 46, r: 12, t: 10, b: 28 };
+    var svg = el('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': title + ' over time' }, card);
+    var tmax = sim.total / 60 || 1;
+    var all = []; series.forEach(function (s) { all = all.concat(s.data); });
+    var lo = opts.ymin !== undefined ? opts.ymin : Math.min.apply(null, all), hi = opts.ymax !== undefined ? opts.ymax : Math.max.apply(null, all);
+    if (opts.band) { lo = Math.min(lo, opts.band.lo); hi = Math.max(hi, opts.band.hi); }
+    var ticks = niceTicks(lo, hi, 4); lo = ticks[0]; hi = ticks[ticks.length - 1];
+    var X = function (min) { return m.l + (W - m.l - m.r) * (min / tmax); };
+    var Y = function (v) { return m.t + (H - m.t - m.b) * (1 - (v - lo) / (hi - lo)); };
+    if (opts.band) { el('rect', { x: m.l, y: Y(opts.band.hi), width: W - m.l - m.r, height: Y(opts.band.lo) - Y(opts.band.hi), fill: 'var(--opt)', opacity: 0.16 }, svg); }
+    ticks.forEach(function (v) {
+      el('line', { x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), stroke: 'var(--grid)', 'stroke-width': 1 }, svg);
+      var tx = el('text', { x: m.l - 6, y: Y(v) + 4, 'text-anchor': 'end' }, svg); tx.textContent = String(v);
+    });
+    niceTicks(0, tmax, 5).forEach(function (v) {
+      if (v > tmax + 0.001) { return; }
+      var tx = el('text', { x: X(v), y: H - 8, 'text-anchor': 'middle' }, svg); tx.textContent = String(v);
+    });
+    var xl = el('text', { x: W - m.r, y: H - 8, 'text-anchor': 'end' }, svg); xl.textContent = 'min';
+    var step = Math.max(1, Math.floor(sim.t.length / 400));
+    series.forEach(function (s) {
+      var d = '';
+      for (var i = 0; i < sim.t.length; i += step) { d += (d ? 'L' : 'M') + X(sim.t[i] / 60).toFixed(1) + ',' + Y(s.data[i]).toFixed(1); }
+      var last = sim.t.length - 1; if ((last % step) !== 0) { d += 'L' + X(sim.t[last] / 60).toFixed(1) + ',' + Y(s.data[last]).toFixed(1); }
+      el('path', { d: d, fill: 'none', stroke: s.color, 'stroke-width': 2.2, 'stroke-linejoin': 'round' }, svg);
+    });
+    var cur = el('line', { x1: m.l, x2: m.l, y1: m.t, y2: H - m.b, stroke: 'var(--ink)', 'stroke-width': 1.5, 'stroke-dasharray': '4 3' }, svg);
+    charts.push({ cur: cur, X: X });
+    return card;
+  }
+  function buildGraphs() {
+    var box = $('graphs'); box.innerHTML = ''; charts = [];
+    var wrap = document.createElement('div'); wrap.className = 'charts'; box.appendChild(wrap);
+    wrap.appendChild(chartCard('Battery current (A)', [{ name: 'current', color: 'var(--cyan)', data: sim.I }], { ymin: 0 }));
+    wrap.appendChild(chartCard('Power (kW)', [{ name: 'into the battery', color: 'var(--opt)', data: sim.P }, { name: 'from the grid', color: 'var(--warm)', data: sim.Pg }], { ymin: 0 }));
+    wrap.appendChild(chartCard('State of charge (%)', [{ name: 'SOC', color: 'var(--ink)', data: sim.soc }], { ymin: 0, ymax: 100 }));
+    wrap.appendChild(chartCard('Battery voltage (V)', [{ name: 'terminal voltage', color: 'var(--cold)', data: sim.V }], {}));
+    wrap.appendChild(chartCard('Temperatures (°C)', [{ name: 'battery', color: 'var(--hot)', data: sim.Tb }, { name: 'cable', color: 'var(--cyan)', data: sim.Tc }], { wide: true, band: { lo: 25, hi: 35, label: 'target band of the cooling and heating (assumed)' } }));
+    moveCursors();
+  }
+  function moveCursors() {
+    if (!sim) { return; }
+    var tmin = sim.t[Math.min(sim.t.length - 1, Math.floor(idx))] / 60;
+    charts.forEach(function (c) { var x = c.X(tmin).toFixed(1); c.cur.setAttribute('x1', x); c.cur.setAttribute('x2', x); });
+  }
+
+  /* ------------------------------------------------------------ sankey */
+  var skSvg = null, skTable = null;
+  function buildSankeyShell() {
+    var box = $('sankey'); box.innerHTML = '';
+    var w = document.createElement('div'); w.className = 'sankeywrap'; box.appendChild(w);
+    skSvg = el('svg', { viewBox: '0 0 960 470', role: 'img', 'aria-label': 'Sankey diagram of the energy from the grid to the battery and the losses on the way' }, w);
+    var p = document.createElement('p'); p.className = 'summary'; p.textContent = 'Energy accumulated so far, from the grid to the battery. Loss bands are drawn with a minimum width so that small losses stay visible.'; box.appendChild(p);
+    skTable = document.createElement('table'); skTable.className = 'vals'; box.appendChild(skTable);
+  }
+  function drawSankey(i) {
+    if (!sim || !skSvg) { return; }
+    var c = sim.c[clamp(Math.floor(i), 0, sim.c.length - 1)];
+    var tot = sim.E; // final totals for the scale
+    var scale = 220 / Math.max(tot.grid, 0.5);
+    var X = [70, 230, 390, 550, 710, 870], top = 70, bw = 14;
+    var rem = [c[0], c[0] - c[1], c[0] - c[1] - c[2], c[0] - c[1] - c[2] - c[3], c[0] - c[1] - c[2] - c[3] - c[4], c[6]];
+    // numerical safety: stored energy at this moment
+    rem[5] = Math.max(0, rem[4] - c[5]);
+    var names = ['Grid', 'Charger input', 'After AC/DC', 'After cable', 'After DC/DC', 'Stored'];
+    var lossNames = ['Cooling and heating', 'AC/DC losses', 'Cable losses', 'DC/DC losses', 'Pack internal losses'];
+    var lossVals = [c[1], c[2], c[3], c[4], c[5]];
+    skSvg.innerHTML = '';
+    var h = rem.map(function (v) { return Math.max(0, v * scale); });
+    for (var k = 0; k < 5; k++) {
+      var x0 = X[k] + bw, x1 = X[k + 1];
+      var hm = Math.max(h[k + 1], 0);
+      el('rect', { x: x0, y: top, width: x1 - x0, height: hm, fill: k === 4 ? 'var(--opt)' : 'var(--opt)', opacity: 0.55 }, skSvg);
+      var lh = Math.max(2.5, (h[k] - h[k + 1]));
+      var ya = top + hm, yb = ya + lh;
+      var ex = x0 + 118, ey = 330 + (k % 2) * 6, lt = Math.max(lh, 2.5);
+      var d = 'M' + x0 + ',' + ya + ' C' + (x0 + 70) + ',' + ya + ' ' + (ex - 70) + ',' + ey + ' ' + ex + ',' + ey + ' L' + ex + ',' + (ey + lt) + ' C' + (ex - 70) + ',' + (ey + lt) + ' ' + (x0 + 70) + ',' + yb + ' ' + x0 + ',' + yb + ' Z';
+      var pth = el('path', { d: d, fill: 'var(--loss)', opacity: 0.6 }, skSvg);
+      var ttl = el('title', {}, pth); ttl.textContent = lossNames[k] + ': ' + lossVals[k].toFixed(2) + ' kWh';
+      var tx = el('text', { x: ex - 4, y: ey + lt + 18 }, skSvg); tx.textContent = lossNames[k];
+      var tv = el('text', { x: ex - 4, y: ey + lt + 34, class: 'm' }, skSvg);
+      tv.textContent = lossVals[k].toFixed(2) + ' kWh' + (c[0] > 0.01 ? ' (' + (100 * lossVals[k] / c[0]).toFixed(1) + ' %)' : '');
+    }
+    for (var n = 0; n < 6; n++) {
+      var node = el('rect', { x: X[n], y: top, width: bw, height: Math.max(h[n], 2), fill: n === 5 ? 'var(--opt)' : 'var(--ink)' }, skSvg);
+      var nt = el('text', { x: X[n] + (n === 5 ? bw : 0), y: top - 30, 'text-anchor': n === 5 ? 'end' : 'start' }, skSvg); nt.textContent = names[n];
+      var nv = el('text', { x: X[n] + (n === 5 ? bw : 0), y: top - 14, 'text-anchor': n === 5 ? 'end' : 'start', class: 'm' }, skSvg); nv.textContent = rem[n].toFixed(1) + ' kWh';
+    }
+    var rows = '<tr><th>Stage</th><th>Energy (kWh)</th><th>Share of grid energy</th></tr>';
+    var all = [['Energy from the grid', c[0]]].concat(lossNames.map(function (nm, j) { return [nm, lossVals[j]]; })).concat([['Stored in the battery', rem[5]]]);
+    all.forEach(function (r) { rows += '<tr><td>' + r[0] + '</td><td>' + r[1].toFixed(2) + '</td><td>' + (c[0] > 0.01 ? (100 * r[1] / c[0]).toFixed(1) + ' %' : '–') + '</td></tr>'; });
+    skTable.innerHTML = rows;
+  }
+
+  /* ------------------------------------------------------------ theme */
+  var themeBtn = $('theme');
+  function systemDark() { return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches; }
+  function isDark() { var t = document.documentElement.getAttribute('data-theme'); return t ? t === 'dark' : systemDark(); }
+  function syncTheme() { var d = isDark(); themeBtn.textContent = d ? 'Light mode' : 'Dark mode'; themeBtn.setAttribute('aria-pressed', d ? 'true' : 'false'); }
+  themeBtn.addEventListener('click', function () { document.documentElement.setAttribute('data-theme', isDark() ? 'light' : 'dark'); syncTheme(); });
+  syncTheme();
+})();
+</script>
+</body>
+</html>
